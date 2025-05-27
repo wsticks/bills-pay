@@ -5,12 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.interswitch.user_management.constant.GlobalConstant;
 import com.interswitch.user_management.enums.GlobalEnum;
 import com.interswitch.user_management.model.entity.Biller;
+import com.interswitch.user_management.model.entity.Category;
 import com.interswitch.user_management.model.request.BillerRequest;
 import com.interswitch.user_management.model.request.UpdateBillerRequest;
 import com.interswitch.user_management.model.response.BillerResponse;
 import com.interswitch.user_management.model.response.GlobalResponse;
 import com.interswitch.user_management.repository.BillerRepository;
+import com.interswitch.user_management.repository.CategoryRepository;
 import com.interswitch.user_management.service.BillerService;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -20,6 +23,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -29,28 +33,73 @@ public class BillerServiceImpl  implements BillerService {
     private BillerRepository billerRepository;
 
     @Autowired
+    private CategoryRepository categoryRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
-    public GlobalResponse createBiller(BillerRequest billerRequest){
-        Map<Object,Object> data = new HashMap<>();
-        try{
-            BillerResponse response;
-            Biller biller;
-            biller = objectMapper.convertValue(billerRequest,Biller.class);
+    public GlobalResponse createBiller(BillerRequest billerRequest) {
+        Map<Object, Object> data = new HashMap<>();
+        try {
+            Category category = categoryRepository.findByCategoryId(billerRequest.getCategoryId());
+                    if(category == null){
+                        return new GlobalResponse(
+                                GlobalEnum.E0000.getValue(),
+                                "Category not found with ID: " + billerRequest.getCategoryId(),
+                                data
+                        );
+                    }
+
+            Biller biller = new Biller();
+            biller.setBillerName(billerRequest.getBillerName());
+            biller.setBillerId(UUID.randomUUID().toString());
+            biller.setCategory(category);
+            biller.setCreatedAt(Timestamp.valueOf(LocalDateTime.now()));
+            biller.setUpdatedAt(Timestamp.valueOf(LocalDateTime.now()));
+
+            // 3. Save biller (only once)
             biller = billerRepository.save(biller);
-            biller = billerRepository.save(biller);
-            response = objectMapper.convertValue(biller,BillerResponse.class);
-            data.put("biller",response);
-            log.info("Success:::: Biller created successfully with response: {}", response);
-            return new GlobalResponse(GlobalEnum.S0000.getValue(),
+
+            // 4. Convert to response DTO
+            BillerResponse response = convertToBillerResponse(biller);
+
+            data.put("biller", response);
+            log.info("Success:::: Biller created successfully with ID: {}", biller.getBillerId());
+
+            return new GlobalResponse(
+                    GlobalEnum.S0000.getValue(),
                     GlobalConstant.Biller_Created_Successfully,
-                    data);
-        } catch (Exception e){
-            log.error("ERROR ::: Biller creation failed : {} ", e.getMessage());
-            return new GlobalResponse(GlobalEnum.E0000.getValue(),
+                    data
+            );
+        } catch (EntityNotFoundException e) {
+            log.error("ERROR ::: Category not found: {}", e.getMessage());
+            return new GlobalResponse(
+                    GlobalEnum.E0000.getValue(),
+                    "Associated category not found",
+                    data
+            );
+        } catch (Exception e) {
+            log.error("ERROR ::: Biller creation failed: {}", e.getMessage(), e);
+            return new GlobalResponse(
+                    GlobalEnum.E0000.getValue(),
                     GlobalConstant.Error_Creating_Biller,
-                    data);
+                    data
+            );
         }
+    }
+
+    private BillerResponse convertToBillerResponse(Biller biller) {
+        BillerResponse response = new BillerResponse();
+        response.setBillerId(biller.getBillerId());
+        response.setBillerName(biller.getBillerName());
+
+        // Include minimal category info if needed
+        if (biller.getCategory() != null) {
+            response.setCategoryId(biller.getCategory().getCategoryId());
+            response.setCategoryName(biller.getCategory().getCategoryName());
+        }
+
+        return response;
     }
 
     public GlobalResponse updateBiller(UpdateBillerRequest request, String billerId) {
@@ -94,8 +143,13 @@ public class BillerServiceImpl  implements BillerService {
         try{
             Biller fetchedBiller = billerRepository.findByBillerId(billerId);
             if (fetchedBiller != null) {
-                BillerResponse billerResponse = objectMapper.convertValue(fetchedBiller,
-                        BillerResponse.class);
+                BillerResponse billerResponse = new BillerResponse();
+                billerResponse.setBillerId(fetchedBiller.getBillerId());
+                billerResponse.setBillerName(fetchedBiller.getBillerName());
+                billerResponse.setBillerId(fetchedBiller.getBillerId());
+                billerResponse.setCategoryId(fetchedBiller.getCategory().getCategoryId());
+                billerResponse.setCategoryName(fetchedBiller.getCategory().getCategoryName());
+//
                 data.put("fetchedBiller", billerResponse);
                 return new GlobalResponse(GlobalEnum.S0000.getValue(),
                         GlobalConstant.Biller_Fetched_Successfully,

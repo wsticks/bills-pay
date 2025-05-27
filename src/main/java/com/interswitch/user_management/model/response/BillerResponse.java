@@ -11,4 +11,6 @@ public class BillerResponse {
 
     private String billerId;
     private String billerName;
+    private String categoryId;
+    private String categoryName;
 }

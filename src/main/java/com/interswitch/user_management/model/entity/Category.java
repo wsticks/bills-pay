@@ -27,6 +27,7 @@ public class Category {
     private String categoryId = UUID.randomUUID().toString();
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "category")
+    @ToString.Exclude
     private List<Biller> billers;
 
     @CreationTimestamp

@@ -9,7 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/billers/")
+@RequestMapping("/api/v2/billers")
 public class BillerController {
 
     @Autowired
@@ -35,13 +35,13 @@ public class BillerController {
         return billerService.fetchBiller(billerId);
     }
 
-    @GetMapping("fetch_all")
+    @GetMapping("/fetch_all")
     @PreAuthorize("hasRole('CAN_FETCH_BILLERS')")
     public GlobalResponse fetchBillers() {
         return billerService.fetchBillers();
     }
 
-    @DeleteMapping("delete")
+    @DeleteMapping("/delete")
     @PreAuthorize("hasRole('CAN_DELETE_BILLERS')")
     public GlobalResponse deleteProduct(String billerId) {
         return billerService.deleteBiller(billerId);
