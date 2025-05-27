@@ -20,10 +20,7 @@ import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @Slf4j
@@ -172,11 +169,9 @@ public class BillerServiceImpl  implements BillerService {
         Map<Object,Object> data = new HashMap<>();
         try{
             List<Biller> fetchBillers = billerRepository.findAll();
-            List<BillerResponse> billerResponseList = objectMapper.convertValue(
-                    fetchBillers,
-                    new TypeReference<List<BillerResponse>>() {}
-            );
-            data.put("fetchedBillers", billerResponseList);
+            List<BillerResponse> billerResponseList = new ArrayList<>();
+
+            data.put("fetchedBillers", fetchBillers);
             return new GlobalResponse(GlobalEnum.S0000.getValue(),
                     GlobalConstant.Billers_Fetched_Successfully,
                     data);
