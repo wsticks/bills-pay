@@ -15,6 +15,7 @@ import com.interswitch.user_management.model.response.GlobalResponse;
 import com.interswitch.user_management.repository.BillerRepository;
 import com.interswitch.user_management.repository.CategoryRepository;
 import com.interswitch.user_management.service.CategoryService;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import org.springframework.stereotype.Service;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -70,21 +72,26 @@ public class CategoryServiceImpl implements CategoryService {
     public GlobalResponse updateCategory(UpdateCategoryRequest request, String categoryId) {
         Map<Object, Object> data = new HashMap<>();
         try {
+            // 1. Find existing category
             Category existingCategory = categoryRepository.findByCategoryId(categoryId);
-            if (existingCategory == null) {
-                return new GlobalResponse(
-                        GlobalEnum.E0000.getValue(),
-                        GlobalConstant.Category_Not_Found,
-                        data
-                );
+            if(existingCategory == null){
+            return new GlobalResponse(
+                    GlobalEnum.E0000.getValue(),
+                    "Category not found with ID: " + categoryId,
+                    data
+            );
             }
             existingCategory.setCategoryName(request.getCategoryName());
             existingCategory.setUpdatedAt(Timestamp.valueOf(LocalDateTime.now()));
-            Category updatedBiller = categoryRepository.save(existingCategory);
-            BillerResponse response = objectMapper.convertValue(updatedBiller, BillerResponse.class);
 
-            data.put("updatedCategory", response);
-            log.info("Success ::: Category updated successfully with response: {}", response);
+            // 3. Save the updated category
+            Category updatedCategory = categoryRepository.save(existingCategory);
+
+            // 4. Convert to response DTO
+            CategoryResponse response = convertToCategoryResponse(updatedCategory);
+
+            data.put("category", response);  // Changed key to "category" for consistency
+            log.info("Success ::: Category updated successfully with ID: {}", categoryId);
 
             return new GlobalResponse(
                     GlobalEnum.S0000.getValue(),
@@ -92,14 +99,44 @@ public class CategoryServiceImpl implements CategoryService {
                     data
             );
 
+        } catch (EntityNotFoundException e) {
+            log.error("ERROR ::: Category not found: {}", e.getMessage());
+            return new GlobalResponse(
+                    GlobalEnum.E0000.getValue(),
+                    GlobalConstant.Category_Not_Found,
+                    data
+            );
         } catch (Exception e) {
-            log.error("ERROR ::: Category update failed : {}", e.getMessage(), e);
+            log.error("ERROR ::: Category update failed: {}", e.getMessage(), e);
             return new GlobalResponse(
                     GlobalEnum.E0000.getValue(),
                     GlobalConstant.Error_Updating_Category,
                     data
             );
         }
+    }
+
+    private CategoryResponse convertToCategoryResponse(Category category) {
+        CategoryResponse response = new CategoryResponse();
+        response.setId(category.getId());
+        response.setCategoryName(category.getCategoryName());
+        response.setCategoryId(category.getCategoryId());
+        response.setCreatedAt(category.getCreatedAt());
+        response.setUpdatedAt(category.getUpdatedAt());
+
+        if (category.getBillers() != null) {
+            List<BillerResponse> billerResponses = category.getBillers().stream()
+                    .map(biller -> {
+                        BillerResponse br = new BillerResponse();
+                        br.setBillerId(biller.getBillerId());
+                        br.setBillerName(biller.getBillerName());
+                        return br;
+                    })
+                    .collect(Collectors.toList());
+            response.setBillers(billerResponses);
+        }
+
+        return response;
     }
 
     public GlobalResponse getCategory(String categoryId){
